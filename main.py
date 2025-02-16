@@ -6,7 +6,8 @@ import json
 from cocktail_recommender import CocktailRecommender
 import os
 from pydantic import BaseModel
-
+from dotenv import load_dotenv
+load_dotenv()
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

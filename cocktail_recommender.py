@@ -8,6 +8,11 @@ from typing import List, Dict, Any
 from dataclasses import dataclass
 from openai import OpenAI
 import json
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env file
+load_dotenv()
 
 @dataclass
 class Cocktail:
@@ -22,10 +27,11 @@ class Cocktail:
     thumbnail: str
 
 class CocktailRecommender:
-    def __init__(self, csv_path: str, openai_api_key: str):
+    def __init__(self, csv_path: str, openai_api_key: str = None):
         self.df = pd.read_csv(csv_path)
         self.model = SentenceTransformer('all-MiniLM-L6-v2')
-        self.openai_client = OpenAI(api_key=openai_api_key)
+        # Use OpenAI API key from environment variables if not provided
+        self.openai_client = OpenAI(api_key=openai_api_key or os.getenv('OPENAI_API_KEY'))
         self.init_database()
         self.init_faiss_index()
         
@@ -210,10 +216,8 @@ Explain why they are similar and return only the cocktail names."""
 
 # Example usage
 if __name__ == "__main__":
-    recommender = CocktailRecommender(
-        'cocktails.csv',
-        'your-openai-api-key'
-    )
+    # The OpenAI API key will be loaded from the .env file
+    recommender = CocktailRecommender('cocktails.csv')
     
     # Example: Search by ingredients
     results = recommender.ingredient_based_search(['Vodka', 'Orange juice'])
