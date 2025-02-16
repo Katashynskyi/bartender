@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cocktail Advisor Chat</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.js"></script>
+    <style>
+        :root {
+            --streamlit-blue: rgb(255, 75, 75);
+        }
+        .chat-container {
+            height: calc(100vh - 200px);
+            max-width: 730px;
+        }
+        .message-list {
+            height: calc(100% - 60px);
+        }
+        .user-message {
+            background-color: var(--streamlit-blue);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            color: white;
+            max-width: 85%;
+            margin-left: auto;
+            margin-bottom: 1rem;
+        }
+        .assistant-message {
+            background-color: #f0f2f6;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            color: black;
+            max-width: 85%;
+            margin-right: auto;
+            margin-bottom: 1rem;
+        }
+        .system-message {
+            background-color: #e0e0e0;
+            border-radius: 0.5rem;
+            padding: 0.5rem 1rem;
+            color: #666;
+            max-width: 85%;
+            margin: 0 auto 1rem auto;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+        .cocktail-card {
+            background-color: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        .input-container {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 730px;
+            background-color: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .sidebar {
+            position: fixed;
+            right: 1rem;
+            top: 5rem;
+            width: 250px;
+            background-color: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8 text-center">🍸 Cocktail Advisor Chat</h1>
+        
+        <!-- Main Chat Area -->
+        <div class="chat-container mx-auto">
+            <div class="message-list overflow-y-auto mb-4 pb-20" id="messageList">
+                <!-- Messages will be added here -->
+            </div>
+            
+            <div class="input-container">
+                <div class="flex gap-2 max-w-2xl mx-auto">
+                    <input type="text" id="messageInput" 
+                           class="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400"
+                           placeholder="Ask about cocktails...">
+                    <button onclick="sendMessage()" 
+                            class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400">
+                        Send
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <h2 class="text-xl font-bold mb-4">📊 History & Stats</h2>
+            
+            <!-- Favorite Ingredients -->
+            <div class="mb-6">
+                <h3 class="font-semibold mb-2">Most Searched Ingredients</h3>
+                <ul id="favoritesList" class="text-sm">
+                    <!-- Favorites will be added here -->
+                </ul>
+            </div>
+            
+            <!-- Recent Searches -->
+            <div>
+                <h3 class="font-semibold mb-2">Recent Searches</h3>
+                <ul id="historyList" class="text-sm">
+                    <!-- History will be added here -->
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = new WebSocket(`ws://${window.location.host}/ws`);
+        
+        ws.onopen = () => {
+            addSystemMessage("Connected to Cocktail Advisor! Ask me anything about cocktails.");
+            loadFavorites();
+            loadHistory();
+        };
+        
+        ws.onmessage = (event) => {
+            const response = JSON.parse(event.data);
+            handleResponse(response);
+        };
+        
+        ws.onclose = () => {
+            addSystemMessage("Connection lost. Please refresh the page.");
+        };
+        
+        function addMessage(message, isUser = false) {
+            const messageList = document.getElementById('messageList');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = isUser ? 'user-message' : 'assistant-message';
+            messageDiv.textContent = message;
+            messageList.appendChild(messageDiv);
+            messageList.scrollTop = messageList.scrollHeight;
+        }
+        
+        function addSystemMessage(message) {
+            const messageList = document.getElementById('messageList');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'system-message';
+            messageDiv.textContent = message;
+            messageList.appendChild(messageDiv);
+            messageList.scrollTop = messageList.scrollHeight;
+        }
+        
+        function displayCocktail(cocktail) {
+            const messageList = document.getElementById('messageList');
+            const cocktailDiv = document.createElement('div');
+            cocktailDiv.className = 'cocktail-card';
+            
+            cocktailDiv.innerHTML = `
+                <div class="flex">
+                    ${cocktail.thumbnail ? 
+                        `<img src="${cocktail.thumbnail}" alt="${cocktail.name}" class="w-24 h-24 object-cover rounded mr-4">` 
+                        : ''}
+                    <div class="flex-1">
+                        <h3 class="font-bold text-lg text-gray-900">${cocktail.name}</h3>
+                        <p class="text-sm text-gray-600">
+                            ${cocktail.category} | ${cocktail.alcoholic} | ${cocktail.glass_type}
+                        </p>
+                        <div class="mt-2">
+                            <strong class="text-gray-900">Ingredients:</strong>
+                            <ul class="list-disc list-inside text-gray-700">
+                                ${cocktail.ingredients.map((ing, i) => 
+                                    `<li>${cocktail.measures[i]} ${ing}</li>`
+                                ).join('')}
+                            </ul>
+                        </div>
+                        <div class="mt-2">
+                            <strong class="text-gray-900">Instructions:</strong>
+                            <p class="text-gray-700">${cocktail.instructions}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            messageList.appendChild(cocktailDiv);
+            messageList.scrollTop = messageList.scrollHeight;
+        }
+        
+        function handleResponse(response) {
+            if (response.type === "error") {
+                addSystemMessage(`Error: ${response.message}`);
+                return;
+            }
+            
+            if (response.type === "similar") {
+                addMessage(response.explanation);
+                response.cocktails.forEach(cocktail => displayCocktail(cocktail));
+            } else if (response.type === "ingredients") {
+                response.cocktails.forEach(cocktail => displayCocktail(cocktail));
+            }
+            
+            loadFavorites();
+            loadHistory();
+        }
+        
+        async function loadFavorites() {
+            const response = await fetch('/api/favorites');
+            const data = await response.json();
+            
+            const favoritesList = document.getElementById('favoritesList');
+            favoritesList.innerHTML = data.favorites
+                .map(([ing, count]) => `<li class="mb-1">• ${ing}: ${count} searches</li>`)
+                .join('');
+        }
+        
+        async function loadHistory() {
+            const response = await fetch('/api/history');
+            const data = await response.json();
+            
+            const historyList = document.getElementById('historyList');
+            historyList.innerHTML = data.history
+                .map(entry => {
+                    if (entry.query_type === 'ingredient_search') {
+                        return `<li class="mb-1">🔍 Searched for: ${entry.ingredients.join(', ')}</li>`;
+                    } else {
+                        return `<li class="mb-1">🔍 Similar to: ${entry.query}</li>`;
+                    }
+                })
+                .join('');
+        }
+        
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (message) {
+                addMessage(message, true);
+                
+                if (message.toLowerCase().includes('contain')) {
+                    const ingredients = message.toLowerCase()
+                        .replace(/.*contain[ing]?\s+/, '')
+                        .split(/,\s*|\s+and\s+/);
+                    
+                    ws.send(JSON.stringify({
+                        ingredients: ingredients
+                    }));
+                } else if (message.toLowerCase().includes('similar to')) {
+                    const cocktailName = message.toLowerCase()
+                        .replace(/.*similar to\s+["']?([^"']+)["']?/, '$1');
+                    
+                    ws.send(JSON.stringify({
+                        cocktail_name: cocktailName
+                    }));
+                } else {
+                    ws.send(JSON.stringify({
+                        cocktail_name: message
+                    }));
+                }
+                
+                input.value = '';
+            }
+        }
+        
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
